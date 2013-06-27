@@ -6,6 +6,9 @@ GTK_LIBS = $(shell pkg-config $(GTK_PC) --libs)
 CFLAGS = -g
 CFLAGS += $(GTK_CFLAGS)
 
+prefix = /usr
+bindir = $(prefix)/bin
+
 %.o: %.c
 	$(CC) $(CFLAGS) $(GTK_CFLAGS)-c $< -o $@
 
@@ -14,3 +17,7 @@ gapk: gapk.o
 
 clean:
 	rm gapk *.o
+
+install: gapk
+	install -Dm755 gapk $(DESTDIR)$(bindir)/gapk
+
