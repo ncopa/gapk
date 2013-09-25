@@ -8,11 +8,13 @@ struct apk_window {
 	GtkWidget *progress;
 	GtkWidget *buttonbox;
 	GtkWidget *button;
+	GTimer *timer;
 };
 
-static gboolean progress_io_cb(GIOChannel *io, GIOCondition condition, gpointer data)
+static gboolean progress_io_cb(GIOChannel *io, GIOCondition condition,
+			       gpointer data)
 {
-	GtkWidget *progress = data;
+	struct apk_window *win = data;
 	GError *err = NULL;
 	gchar *buf;
 	gsize len;
@@ -20,14 +22,28 @@ static gboolean progress_io_cb(GIOChannel *io, GIOCondition condition, gpointer 
 	status = g_io_channel_read_line(io, &buf, &len, NULL, &err);
 	if (buf != NULL) {
 		float done, total;
-		if (sscanf(buf, "%f/%f", &done, &total) == 2)
-			gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress), done/total);
+		if (sscanf(buf, "%f/%f", &done, &total) == 2) {
+			if (win->timer == NULL && total > 0)
+				win->timer = g_timer_new();
+			gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(win->progress), done/total);
+			if (win->timer != NULL) {
+				gulong ms;
+				gchar *size, *txt;
+				size = g_format_size(done / g_timer_elapsed(win->timer, &ms));
+				txt = g_strconcat(size, "/s", NULL);
+
+				gtk_progress_bar_set_text(GTK_PROGRESS_BAR(win->progress), txt);
+				g_free(size);
+				g_free(txt);
+			}
+		}
 		g_free(buf);
 	}
 	return TRUE;
 }
 
-static gboolean output_io_cb(GIOChannel *io, GIOCondition condition, gpointer data)
+static gboolean output_io_cb(GIOChannel *io, GIOCondition condition,
+			     gpointer data)
 {
 	GtkTextBuffer *viewbuf = gtk_text_view_get_buffer(GTK_TEXT_VIEW(data));
 	GtkTextIter iter;
@@ -69,6 +85,7 @@ struct apk_window *win_init(int progress_fd, int out_fd, int err_fd)
 	gtk_widget_show(win.textview);
 
 	win.progress = gtk_progress_bar_new();
+	gtk_progress_bar_set_show_text(GTK_PROGRESS_BAR(win.progress), TRUE);
 	gtk_box_pack_start(GTK_BOX(win.vbox), win.progress, FALSE, FALSE, 0);
 	gtk_widget_show(win.progress);
 
@@ -87,7 +104,8 @@ struct apk_window *win_init(int progress_fd, int out_fd, int err_fd)
 	gtk_widget_show(win.mainwin);
 
 	progress_io = g_io_channel_unix_new(progress_fd);
-	g_io_add_watch(progress_io, G_IO_IN, progress_io_cb, win.progress);
+	win.timer = NULL;
+	g_io_add_watch(progress_io, G_IO_IN, progress_io_cb, &win);
 
 	out_io = g_io_channel_unix_new(out_fd);
 	g_io_add_watch(out_io, G_IO_IN, output_io_cb, win.textview);
