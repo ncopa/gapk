@@ -75,7 +75,7 @@ struct apk_window *win_init(int progress_fd, int out_fd, int err_fd)
 
 	win.vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
 
-	gtk_widget_set_size_request(scrollwin, 640, 400);
+	gtk_widget_set_size_request(scrollwin, 600, 106);
 	win.textview = gtk_text_view_new();
 	gtk_text_view_set_editable(GTK_TEXT_VIEW(win.textview), FALSE);
 	gtk_container_add(GTK_CONTAINER(scrollwin), win.textview);
